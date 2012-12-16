@@ -36,14 +36,26 @@
 int le_opendkim;
 DKIM_LIB *opendkim_master;
 
+static zend_class_entry *opendkim_sign_class_entry;
+static zend_function_entry opendkim_sign_class_functions[] = {
+	PHP_FALIAS(header, opendkim_header, NULL)
+	PHP_FALIAS(eoh, opendkim_eoh, NULL)
+	PHP_FALIAS(body, opendkim_body, NULL)
+	PHP_FALIAS(eom, opendkim_eom, NULL)
+	PHP_FALIAS(chunk, opendkim_chunk, NULL)
+    PHP_FALIAS(getSignatureHeader, opendkim_getsighdr, NULL)
+    PHP_FALIAS(getError, opendkim_geterror, NULL)
+    PHP_FALIAS(loadPrivateKey, opendkim_privkey_load, NULL)
+    PHP_FALIAS(setSigner, opendkim_set_signer, NULL)
+    PHP_FALIAS(setMargin, opendkim_set_margin, NULL)
+    PHP_FALIAS(setPartial, opendkim_setpartial, NULL)
+	PHP_ME(opendkim_sign, __construct, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(opendkim_free, __destruct, NULL, ZEND_ACC_PUBLIC)
+	{NULL, NULL, NULL}
+};
+
 static zend_function_entry opendkim_functions[] = {
-	PHP_FE(opendkim_sign,		NULL)
-	PHP_FE(opendkim_header,		NULL)
-	PHP_FE(opendkim_body,		NULL)
-	PHP_FE(opendkim_chunk,		NULL)
-	PHP_FE(opendkim_eoh,		NULL)
-	PHP_FE(opendkim_eom,		NULL)
-	PHP_FE(opendkim_getsighdr,	NULL)
+    PHP_FE(opendkim_flush_cache, NULL)
 	{NULL, NULL, NULL}
 };
 
@@ -75,6 +87,7 @@ ZEND_RSRC_DTOR_FUNC(php_opendkim_dtor)
     if (dkim) {
     	dkim_free(dkim);
     }
+    rsrc->ptr = NULL;
 }
 /* End destructors */
 /* INIT / SHUTDOWN */
@@ -88,11 +101,13 @@ PHP_MINIT_FUNCTION(opendkim)
 		return FAILURE;
 	}
 
-	/*options=DKIM_LIBFLAGS_ZTAGS|DKIM_LIBFLAGS_FIXCRLF;
-	(void) dkim_options(dkim_master, DKIM_OP_SETOPT, DKIM_OPTS_FLAGS,
-	                    &options, sizeof options);
-*/
+    /* OpenDKIM Ressource Destructor */
     le_opendkim = zend_register_list_destructors_ex(php_opendkim_dtor, NULL, PHP_OPENDKIM_RES_NAME, module_number);
+
+    /* Class Registration */
+	zend_class_entry ce;
+	INIT_CLASS_ENTRY(ce, "OpenDKIMSign", opendkim_sign_class_functions);
+	opendkim_sign_class_entry = zend_register_internal_class_ex(&ce, NULL, NULL TSRMLS_CC);
     return SUCCESS;
 }
 /* END INIT/SHUTDOWN */
@@ -113,9 +128,10 @@ PHP_MINFO_FUNCTION(opendkim)
 }
 
 /*** The Functions by themselves ***/
-/* {{{ proto resource opendkim_sign(privateKey, selector, domain[, header_canon[, body_canon[, sign_alg[, body_length]]]])
+/* {{{ proto void OpenDKIMSigner(privateKey, selector, domain[, header_canon[, body_canon[, sign_alg[, body_length]]]])
+    constructor
 */
-PHP_FUNCTION(opendkim_sign)
+PHP_METHOD(opendkim_sign, __construct)
 {
 	DKIM *dkim;
 	DKIM_STAT status=0;
@@ -128,6 +144,7 @@ PHP_FUNCTION(opendkim_sign)
 	dkim_canon_t header_canon=DKIM_CANON_RELAXED, body_canon=DKIM_CANON_RELAXED;
 	dkim_alg_t sign_alg=DKIM_SIGN_RSASHA1;
 	long body_length=-1;
+    zval *opendkim_ressource;
 
 	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sss|llll", &privateKey, &privateKeyLen, &selector, &selectorLen, &domain, &domainLen, &header_canon, &body_canon, &sign_alg, &body_length) == FAILURE) {
         RETURN_NULL();
@@ -135,17 +152,31 @@ PHP_FUNCTION(opendkim_sign)
 
 	dkim=dkim_sign(opendkim_master, "", NULL, privateKey, selector, domain, header_canon, body_canon, sign_alg, body_length, &status);
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_sign");
-	}
-	/*status=dkim_set_margin(dkim, 0);
-	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "An error occured in dkim_sign, unable to drop wraping");
-	}*/
-
-    ZEND_REGISTER_RESOURCE(return_value, dkim, le_opendkim);
+        RETURN_BOOL(0);
+	} else {
+    	ALLOC_INIT_ZVAL(opendkim_ressource);
+        ZEND_REGISTER_RESOURCE(opendkim_ressource, dkim, le_opendkim);
+    	add_property_zval(this_ptr, "descriptor", opendkim_ressource);
+    }
 }/* }}} */
 
-/* {{{ proto boolean opendkim_header(dkim_res, header)
+/* {{{ proto void ~OpenDKIMSign() and ~OpenDKIMVerify
+   destructor
+   */
+PHP_METHOD(opendkim_free, __destruct)
+{
+	zval **data;
+	
+	if (SUCCESS == zend_hash_find(HASH_OF(this_ptr), "descriptor",
+					sizeof("descriptor"), (void**)&data)) {
+		zval_ptr_dtor(data);
+	}
+}
+/* }}} end ~OpenDKIMSign / ~OpenDKIMVerify Destructor */
+
+/* {{{ proto boolean 
+
+/* {{{ proto boolean header(header)
  */
 PHP_FUNCTION(opendkim_header)
 {
@@ -155,7 +186,8 @@ PHP_FUNCTION(opendkim_header)
 	char *header;
 	int   headerLen;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &z_dk_ressource, &header, &headerLen) == FAILURE) {
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &header, &headerLen) == FAILURE) {
         RETURN_NULL();
     }
     ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
@@ -163,12 +195,13 @@ PHP_FUNCTION(opendkim_header)
 
 	status=dkim_header(dkim, header, headerLen);
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_header");
-	}
-	RETURN_BOOL(1);
+        RETURN_BOOL(0);
+	} else {
+    	RETURN_BOOL(1);
+    }
 }/* }}} */
 
-/* {{{ proto boolean dkim_body(dkim_res, chunk)
+/* {{{ proto boolean body(chunk)
  */
 PHP_FUNCTION(opendkim_body)
 {
@@ -178,7 +211,8 @@ PHP_FUNCTION(opendkim_body)
 	char *body;
 	int   bodyLen;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "rs", &z_dk_ressource, &body, &bodyLen) == FAILURE) {
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &body, &bodyLen) == FAILURE) {
         RETURN_NULL();
     }
     ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
@@ -186,12 +220,13 @@ PHP_FUNCTION(opendkim_body)
 
 	status=dkim_body(dkim, body, bodyLen);
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_body");
-	}
-	RETURN_BOOL(1);
+    	RETURN_BOOL(0);
+	} else {
+    	RETURN_BOOL(1);
+    }
 }/* }}} */
 
-/* {{{ proto boolean dkim_chunk(dkim_res, chunk)
+/* {{{ proto boolean chunk(chunk)
  */
 PHP_FUNCTION(opendkim_chunk)
 {
@@ -202,10 +237,8 @@ PHP_FUNCTION(opendkim_chunk)
 	int   bodyLen=-1;
 	zend_bool end;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r|s", &z_dk_ressource, &body, &bodyLen) == FAILURE) {
- 		if (status!=DKIM_STAT_OK){
-			php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_chunk [A]");
-		}
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|s", &body, &bodyLen) == FAILURE) {
         RETURN_NULL();
     }
     if (bodyLen==0){
@@ -218,12 +251,12 @@ PHP_FUNCTION(opendkim_chunk)
 		status=dkim_chunk(dkim, body, bodyLen);
 	}
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_chunk [B]");
+		RETURN_BOOL(0);
 	}
 	RETURN_BOOL(1);
 }/* }}} */
 
-/* {{{ proto boolean dkim_eoh(dkim_res)
+/* {{{ proto boolean eoh()
  */
 PHP_FUNCTION(opendkim_eoh)
 {
@@ -231,20 +264,17 @@ PHP_FUNCTION(opendkim_eoh)
 	DKIM_STAT status=0;
 	zval *z_dk_ressource;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &z_dk_ressource) == FAILURE) {
-        RETURN_NULL();
-    }
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
     ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
-
 
 	status=dkim_eoh(dkim);
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_eoh");
+		RETURN_BOOL(0);
 	}
 	RETURN_BOOL(1);
 }/* }}} */
 
-/* {{{ proto boolean dkim_eom(dkim_res)
+/* {{{ proto boolean eom()
  */
 PHP_FUNCTION(opendkim_eom)
 {
@@ -252,45 +282,185 @@ PHP_FUNCTION(opendkim_eom)
 	DKIM_STAT status=0;
 	zval *z_dk_ressource;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &z_dk_ressource) == FAILURE) {
-        RETURN_NULL();
-    }
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
     ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
 
 
 	status=dkim_eom(dkim, 0);
-	if (status==DKIM_STAT_INVALID){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_eom [I]");
-	}
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_eom ");
+		RETURN_BOOL(0);
 	}
 	RETURN_BOOL(1);
 }/* }}} */
 
-/* {{{ proto string dkim_getsighdr(dkim_res)
+/* {{{ proto string getsighdr()
  */
 PHP_FUNCTION(opendkim_getsighdr)
 {
 	DKIM *dkim;
 	DKIM_STAT status=0;
 	zval *z_dk_ressource;
+#ifndef dkim_getsighdr_d 
 	char buffer[4096]="";
-
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "r", &z_dk_ressource) == FAILURE) {
-        RETURN_NULL();
-    }
+#else
+    char *buffer;
+    size_t blen;
+#endif
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
     ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
-
+#ifdef dkim_getsighdr_d 
+    status=dkim_getsighdr_d(dkim, 16, &buffer, &blen);
+#else
 #if OPENDKIM_LIB_VERSION<0x02060000
 	status=dkim_getsighdr(dkim, buffer, 4096, 75, 16);
 #else
 	status=dkim_getsighdr(dkim, buffer, 4096, 16);
 #endif
+#endif
 	if (status!=DKIM_STAT_OK){
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "An error occured in dkim_getsighdr");
+		RETURN_BOOL(0);
 	}
-	RETURN_STRING(buffer,1);
-	free(buffer);
-
+#ifdef dkim_getsighdr_d 
+	RETURN_STRINGL(buffer, blen, 1);
+#else
+	RETURN_STRING(buffer, 1);
+#endif
 }/* }}} */
+
+/* {{{ proto string getError()
+ */
+PHP_FUNCTION(opendkim_geterror)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+    const char *error;
+
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+    ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
+
+    error=dkim_geterror(dkim);
+    if (error==NULL) {
+        RETURN_BOOL(0);
+    }
+    RETURN_STRING(error, 1);
+}/* }}} */
+
+/* {{{ proto bool loadPrivateKey() 
+ */
+PHP_FUNCTION(opendkim_privkey_load)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+    DKIM_STAT status;
+
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+    ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
+    
+    status = dkim_privkey_load(dkim);
+    if (status!=DKIM_STAT_OK) {
+        RETURN_BOOL(0);
+    } else {
+        RETURN_BOOL(1);
+    }
+} /* }}} */
+
+/* {{{ proto bool setSigner(signer) 
+ */
+PHP_FUNCTION(opendkim_set_signer)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+	char *signer;
+	int   signerLen;
+    DKIM_STAT status;
+
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &signer, &signerLen) == FAILURE) {
+        RETURN_NULL();
+    }
+    ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
+
+    status=dkim_set_signer(dkim, signer);
+    if (status!=DKIM_STAT_OK) {
+        RETURN_BOOL(0);
+    }
+    RETURN_BOOL(1);
+} /* }}} */
+
+/* {{{ proto bool setMargin(margin) 
+ */
+PHP_FUNCTION(opendkim_set_margin)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+    long margin;
+    DKIM_STAT status;
+
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+    ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &margin) == FAILURE) {
+        RETURN_NULL();
+    }
+
+    status=dkim_set_margin(dkim, margin);
+    if (status!=DKIM_STAT_OK) {
+        RETURN_BOOL(0);
+    }
+    RETURN_BOOL(1);
+} /* }}} */
+
+/* {{{ proto bool setPartial(partial) 
+ */
+PHP_FUNCTION(opendkim_setpartial)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+	char *partial;
+	int   partialLen;
+    DKIM_STAT status;
+
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &partial, &partialLen) == FAILURE) {
+        RETURN_NULL();
+    }
+    ZEND_FETCH_RESOURCE(dkim, DKIM *, &z_dk_ressource, -1, PHP_OPENDKIM_RES_NAME, le_opendkim);
+
+    status=dkim_setpartial(dkim, partial);
+    if (status!=DKIM_STAT_OK) {
+        RETURN_BOOL(0);
+    }
+    RETURN_BOOL(1);
+} /* }}} */
+
+/* {{{ proto bool addQueryMethod(method[, options]) 
+ */
+PHP_FUNCTION(opendkim_add_querymethod)
+{
+	zval *z_dk_ressource;
+	DKIM *dkim;
+	char *method;
+	int   methodLen;
+	char *options;
+	int   optionsLen = -1;
+    DKIM_STAT status;
+    
+    OPENDKIM_GETRESSOURCE(z_dk_ressource);
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|s", &method, &methodLen, &options, &optionsLen) == FAILURE) {
+        RETURN_NULL();
+    }
+
+} /* }}} */
+
+/* {{{ proto int opendkim_flush_cache()
+ */
+PHP_FUNCTION(opendkim_flush_cache)
+{
+    int status;
+	status=dkim_flush_cache(opendkim_master);
+    if (status>0) {
+        RETURN_LONG(status);
+    } else {
+        RETURN_BOOL(0);
+    }
+}/* }}} */
+
