@@ -9,5 +9,5 @@ if test "$PHP_DKIM" != "no"; then
   PHP_SUBST(DKIM_SHARED_LIBADD)
   PHP_ADD_LIBRARY(ssl, , DKIM_SHARED_LIBADD) 
   PHP_ADD_LIBRARY(opendkim, , DKIM_SHARED_LIBADD) 
-  PHP_NEW_EXTENSION(dkim, dkim.c, $ext_shared)
+  PHP_NEW_EXTENSION(opendkim, opendkim.c, $ext_shared)
 fi
