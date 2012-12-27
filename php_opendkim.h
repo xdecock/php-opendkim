@@ -17,44 +17,88 @@
 
   $Id: $ 
 */
+#include <php.h>
+#include <opendkim/dkim.h>
+
 #ifndef PHP_OPENDKIM_H
 #define PHP_OPENDKIM_H 1
 
 #define PHP_OPENDKIM_VERSION "0.9-dev"
 #define PHP_OPENDKIM_EXTNAME "opendkim"
 
-#define OPENDKIM_GETRESSOURCE(data) {	if (FAILURE == zend_hash_find(HASH_OF(this_ptr), "ressource", \
-					sizeof("ressource"), (void**)&data)) { \
-		php_error_docref(NULL TSRMLS_CC, E_ERROR, "internal ressource is not found"); \
-		RETURN_NULL(); \
-	} \
-}
+typedef struct _opendkim_object_handler {
+	zend_object 		zo;
+	DKIM                *handler;
+} opendkim_object_handler; /* extends zend_object */
 
+typedef struct _opendkim_object_pstate {
+	zend_object 		zo;
+	DKIM_PSTATE         *pstate;
+} opendkim_object_pstate; /* extends zend_object */
+
+typedef struct _opendkim_object_queryinfo {
+	zend_object 		zo;
+	DKIM_QUERYINFO      *queryinfo;
+} opendkim_object_queryinfo; /* extends zend_object */
+
+typedef struct _opendkim_object_siginfo {
+	zend_object 		zo;
+	DKIM_SIGINFO        *siginfo;
+} opendkim_object_siginfo; /* extends zend_object */
 
 PHP_MINIT_FUNCTION(opendkim);
 PHP_MSHUTDOWN_FUNCTION(opendkim);
 PHP_MINFO_FUNCTION(opendkim);
 
 /*** The Functions by themselves ***/
-PHP_METHOD(opendkim_sign, __construct);
-PHP_METHOD(opendkim_free, __destruct);
-PHP_FUNCTION(opendkim_sign);
-PHP_FUNCTION(opendkim_header);
-PHP_FUNCTION(opendkim_body);
-PHP_FUNCTION(opendkim_chunk);
-PHP_FUNCTION(opendkim_eoh);
-PHP_FUNCTION(opendkim_eom);
-PHP_FUNCTION(opendkim_getsighdr);
-PHP_FUNCTION(opendkim_geterror);
-PHP_FUNCTION(opendkim_flush_cache);
-PHP_FUNCTION(opendkim_privkey_load);
-PHP_FUNCTION(opendkim_set_margin);
-PHP_FUNCTION(opendkim_set_signer);
-PHP_FUNCTION(opendkim_setpartial);
+PHP_METHOD(opendkim, header);
+PHP_METHOD(opendkim, body);
+PHP_METHOD(opendkim, chunk);
+PHP_METHOD(opendkim, eoh);
+PHP_METHOD(opendkim, eom);
+PHP_METHOD(opendkim, getError);
+PHP_METHOD(opendkim, getCacheStats);
+PHP_METHOD(opendkim, libFeature);
+PHP_METHOD(opendkim, flushCache);
+PHP_METHOD(opendkimFree, __destruct); /* Common function */
+PHP_METHOD(opendkimSign, __construct);
+PHP_METHOD(opendkimSign, loadPrivateKey);
+PHP_METHOD(opendkimSign, setMargin);
+PHP_METHOD(opendkimSign, setSigner);
+PHP_METHOD(opendkimSign, setPartial);
+PHP_METHOD(opendkimSign, addQueryMethod);
+PHP_METHOD(opendkimSign, addXtag);
+PHP_METHOD(opendkimSign, getSignatureHeader);
+
+PHP_METHOD(opendkimVerify, __construct);
+PHP_METHOD(opendkimVerify, checkATPS);
+PHP_METHOD(opendkimVerify, getDomain);
+PHP_METHOD(opendkimVerify, getUser);
+PHP_METHOD(opendkimVerify, getMinBodyLen);
+
+static void opendkim_object_handler_free_storage(void *object TSRMLS_DC);
+static void opendkim_object_pstate_free_storage(void *object TSRMLS_DC);
+static void opendkim_object_queryinfo_free_storage(void *object TSRMLS_DC);
+static void opendkim_object_siginfo_free_storage(void *object TSRMLS_DC);
 
 extern zend_module_entry opendkim_module_entry;
+
+
 #define phpext_opendkim_ptr &opendkim_module_entry
 
-#define PHP_OPENDKIM_RES_NAME "OpenDKIM Keys resource"
+#ifdef PHP_WIN32
+#define PHP_OPENDKIM_API __declspec(dllexport)
+#else
+# if defined(__GNUC__) && __GNUC__ >= 4
+#  define PHP_OPENDKIM_API __attribute__ ((visibility("default")))
+# else
+#  define PHP_OPENDKIM_API
+# endif
+#endif
+
+#define PHP_OPENDKIM_EXPORT(__type) PHP_OPENDKIM_API __type
+
+#define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
+#define OPENDKIM_HANDLER_SETPOINTER(source) ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler=source
 
 #endif
