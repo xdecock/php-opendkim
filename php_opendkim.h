@@ -19,6 +19,9 @@
 */
 #include <php.h>
 #include <opendkim/dkim.h>
+#ifdef ZTS
+#include "TSRM.h"
+#endif
 
 #ifndef PHP_OPENDKIM_H
 #define PHP_OPENDKIM_H 1
@@ -46,8 +49,20 @@ typedef struct _opendkim_object_siginfo {
 	DKIM_SIGINFO        *siginfo;
 } opendkim_object_siginfo; /* extends zend_object */
 
+ZEND_BEGIN_MODULE_GLOBALS(opendkim)
+	DKIM_LIB *opendkim_master;
+ZEND_END_MODULE_GLOBALS(opendkim)
+
+#ifdef ZTS
+#define OPENDKIM_G(v) TSRMG(opendkim_globals_id, zend_opendkim_globals *, v)
+#else
+#define OPENDKIM_G(v) (opendkim_globals.v)
+#endif
+
 PHP_MINIT_FUNCTION(opendkim);
 PHP_MSHUTDOWN_FUNCTION(opendkim);
+PHP_RINIT_FUNCTION(opendkim);
+PHP_RSHUTDOWN_FUNCTION(opendkim);
 PHP_MINFO_FUNCTION(opendkim);
 
 /*** The Functions by themselves ***/
@@ -57,6 +72,8 @@ PHP_METHOD(opendkim, chunk);
 PHP_METHOD(opendkim, eoh);
 PHP_METHOD(opendkim, eom);
 PHP_METHOD(opendkim, getError);
+PHP_METHOD(opendkim, policySyntax);
+/* End Shared Methods */
 PHP_METHOD(opendkim, getCacheStats);
 PHP_METHOD(opendkim, libFeature);
 PHP_METHOD(opendkim, flushCache);
