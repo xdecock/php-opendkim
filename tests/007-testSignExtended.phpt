@@ -41,7 +41,7 @@ if (!$dkim->setSigner('signer@example.com')) {
 if (!$dkim->setPartial(false)) {
     die ('KO:'.__LINE__.':'.$dkim->getError());
 }
-if(!$dkim->eom()) {
+if(OpenDKIM::STAT_OK!==$dkim->eom()) {
     die ('KO:'.__LINE__.':'.$dkim->getError());
 }
 $header=$dkim->getSignatureHeader();

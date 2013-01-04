@@ -29,7 +29,7 @@ if (!$dkim->body('Test'."\r\n")) {
 if (!$dkim->body('Second Line'."\r\n")) {
     die('KO'.__LINE__.$dkim->getError());
 }
-if(!$dkim->eom()) {
+if(OpenDKIM::STAT_OK!=$dkim->eom()) {
     die ('KO'.__LINE__.$dkim->getError());
 }
 $header=$dkim->getSignatureHeader();
