@@ -344,7 +344,6 @@ PHP_MINIT_FUNCTION(opendkim)
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_CLOCKDRIFT",           sizeof("OPTS_CLOCKDRIFT")-1,            (long)DKIM_OPTS_CLOCKDRIFT TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_FIXEDTIME",            sizeof("OPTS_FIXEDTIME")-1,             (long)DKIM_OPTS_FIXEDTIME TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_FLAGS",           		sizeof("OPTS_FLAGS")-1,            		(long)DKIM_OPTS_FLAGS TSRMLS_CC);
-    zend_declare_class_constant_long(opendkim_class_entry, "OPTS_MINKEYBITS",           sizeof("OPTS_MINKEYBITS")-1,            (long)DKIM_OPTS_MINKEYBITS TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_MUSTBESIGNED",         sizeof("OPTS_MUSTBESIGNED")-1,          (long)DKIM_OPTS_MUSTBESIGNED TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_OVERSIGNHDRS",         sizeof("OPTS_OVERSIGNHDRS")-1,          (long)DKIM_OPTS_OVERSIGNHDRS TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_QUERYINFO",            sizeof("OPTS_QUERYINFO")-1,             (long)DKIM_OPTS_QUERYINFO TSRMLS_CC);
@@ -354,6 +353,9 @@ PHP_MINIT_FUNCTION(opendkim)
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_SKIPHDRS",             sizeof("OPTS_SKIPHDRS")-1,              (long)DKIM_OPTS_SKIPHDRS TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_TMPDIR",               sizeof("OPTS_TMPDIR")-1,                (long)DKIM_OPTS_TMPDIR TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_TIMEOUT",              sizeof("OPTS_TIMEOUT")-1,               (long)DKIM_OPTS_TIMEOUT TSRMLS_CC);
+#ifdef DKIM_OPTS_MINKEYBITS
+    zend_declare_class_constant_long(opendkim_class_entry, "OPTS_MINKEYBITS",           sizeof("OPTS_MINKEYBITS")-1,            (long)DKIM_OPTS_MINKEYBITS TSRMLS_CC);
+#endif
 #ifdef DKIM_OPTS_REQUIREDHDRS
     zend_declare_class_constant_long(opendkim_class_entry, "OPTS_REQUIREDHDRS",         sizeof("OPTS_REQUIREDHDRS")-1,          (long)DKIM_OPTS_REQUIREDHDRS TSRMLS_CC);
 #endif
@@ -364,7 +366,6 @@ PHP_MINIT_FUNCTION(opendkim)
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_BADSIGHANDLES",       sizeof("FLAGS_BADSIGHANDLES")-1,        (long)DKIM_LIBFLAGS_BADSIGHANDLES TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_CACHE",               sizeof("FLAGS_CACHE")-1,            	(long)DKIM_LIBFLAGS_CACHE TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_DELAYSIGPROC",        sizeof("FLAGS_DELAYSIGPROC")-1,         (long)DKIM_LIBFLAGS_DELAYSIGPROC TSRMLS_CC);
-    zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_DROPSIGNER",          sizeof("FLAGS_DROPSIGNER")-1,           (long)DKIM_LIBFLAGS_DROPSIGNER TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_EOHCHECK",            sizeof("FLAGS_EOHCHECK")-1,             (long)DKIM_LIBFLAGS_EOHCHECK TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_FIXCRLF",             sizeof("FLAGS_FIXCRLF")-1,              (long)DKIM_LIBFLAGS_FIXCRLF TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_KEEPFILES",           sizeof("FLAGS_KEEPFILES")-1,            (long)DKIM_LIBFLAGS_KEEPFILES TSRMLS_CC);
@@ -373,6 +374,9 @@ PHP_MINIT_FUNCTION(opendkim)
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_TMPFILES",            sizeof("FLAGS_TMPFILES")-1,             (long)DKIM_LIBFLAGS_TMPFILES TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_VERIFYONE",           sizeof("FLAGS_VERIFYONE")-1,            (long)DKIM_LIBFLAGS_VERIFYONE TSRMLS_CC);
     zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_ZTAGS",               sizeof("FLAGS_ZTAGS")-1,                (long)DKIM_LIBFLAGS_ZTAGS TSRMLS_CC);
+#ifdef DKIM_LIBFLAGS_DROPSIGNER
+    zend_declare_class_constant_long(opendkim_class_entry, "FLAGS_DROPSIGNER",          sizeof("FLAGS_DROPSIGNER")-1,           (long)DKIM_LIBFLAGS_DROPSIGNER TSRMLS_CC);
+#endif
 
     /* Query mode */
     zend_declare_class_constant_long(opendkim_class_entry, "QUERY_DNS",                 sizeof("QUERY_DNS")-1,                  (long)DKIM_QUERY_DNS TSRMLS_CC);
@@ -774,7 +778,7 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
 #ifdef dkim_getsighdr_d 
     status=dkim_getsighdr_d(dkim, 16, &buffer, &blen);
 #else
-#if OPENDKIM_LIB_VERSION<0x02060000
+#if OPENDKIM_LIB_VERSION<0x02050000
 	status=dkim_getsighdr(dkim, buffer, 4096, 75, 16);
 #else
 	status=dkim_getsighdr(dkim, buffer, 4096, 16);
