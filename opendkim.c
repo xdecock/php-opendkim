@@ -91,6 +91,12 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_opendkim_verify_checkatps, 0, 0, 0)
     ZEND_ARG_INFO(0, timeout)
 ZEND_END_ARG_INFO();
 
+ZEND_BEGIN_ARG_INFO(arginfo_opendkim_set_option, 0)
+    ZEND_ARG_INFO(0, option)
+    ZEND_ARG_INFO(0, option_value)
+ZEND_END_ARG_INFO();
+
+
 static zend_function_entry opendkim_sign_class_functions[] = {
 	PHP_ME(opendkim,     header,            arginfo_opendkim_header,                ZEND_ACC_PUBLIC)
 	PHP_ME(opendkim,     eoh,               NULL,                                   ZEND_ACC_PUBLIC)
@@ -124,6 +130,7 @@ static zend_function_entry opendkim_class_functions[] = {
     PHP_ME(opendkim,    libFeature,         arginfo_opendkim_lib_feature,           ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    flushCache,         NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    getCacheStats,      NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+    PHP_ME(opendkim,    setOption,          arginfo_opendkim_set_option,            ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     {NULL, NULL, NULL}
 };
 
@@ -479,16 +486,32 @@ PHP_METHOD(opendkimSign, __construct)
 	int   selectorLen;
 	char *domain;
 	int   domainLen;
-	dkim_canon_t header_canon=DKIM_CANON_RELAXED, body_canon=DKIM_CANON_RELAXED;
+	long rheader_canon=-1, rbody_canon =-1;
+	long rsign_alg=-1, rbody_length=-1;
+	dkim_canon_t header_canon=DKIM_CANON_SIMPLE, body_canon=DKIM_CANON_SIMPLE;
 	dkim_alg_t sign_alg=DKIM_SIGN_RSASHA1;
-	long body_length=-1;
+	ssize_t body_length=-1;
     zval *opendkim_ressource;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sss|llll", &privateKey, &privateKeyLen, &selector, &selectorLen, &domain, &domainLen, &header_canon, &body_canon, &sign_alg, &body_length) == FAILURE) {
+	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sss|llll", &privateKey, &privateKeyLen, &selector, &selectorLen, &domain, &domainLen, &rheader_canon, &rbody_canon, &rsign_alg, &rbody_length) == FAILURE) {
         RETURN_NULL();
     }
 
-	dkim=dkim_sign(OPENDKIM_G(opendkim_master), "", NULL, privateKey, selector, domain, header_canon, body_canon, sign_alg, body_length, &status);
+	if (rheader_canon !=-1) {
+	    header_canon = rheader_canon;
+	}
+
+    if (rbody_canon !=-1) {
+        body_canon = rbody_canon;
+    }
+
+    if (rsign_alg !=-1) {
+        sign_alg = rsign_alg;
+    }
+
+    body_length = rbody_length;
+
+	dkim = dkim_sign(OPENDKIM_G(opendkim_master), "", NULL, privateKey, selector, domain, header_canon, body_canon, sign_alg, body_length, &status);
 	if (status!=DKIM_STAT_OK){
         RETURN_BOOL(0);
 	} else {
@@ -766,28 +789,24 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
 	DKIM *dkim;
 	DKIM_STAT status=0;
 	zval *z_dk_ressource;
-#ifndef dkim_getsighdr_d 
-	char buffer[4096]="";
-#else
-    char *buffer;
+#if OPENDKIM_LIB_VERSION>0x01010000
+    u_char *buffer;
     size_t blen;
+#else
+    char buffer[4096]="";
 #endif
 
     OPENDKIM_HANDLER_GETPOINTER(dkim);
 
-#ifdef dkim_getsighdr_d 
+#if OPENDKIM_LIB_VERSION>0x01010000
     status=dkim_getsighdr_d(dkim, 16, &buffer, &blen);
 #else
-#if OPENDKIM_LIB_VERSION<0x02050000
-	status=dkim_getsighdr(dkim, buffer, 4096, 75, 16);
-#else
-	status=dkim_getsighdr(dkim, buffer, 4096, 16);
-#endif
+    status=dkim_getsighdr(dkim, buffer, 4096, 75, 16);
 #endif
 	if (status!=DKIM_STAT_OK){
-		RETURN_BOOL(0);
+		RETURN_LONG(status);
 	}
-#ifdef dkim_getsighdr_d 
+#if OPENDKIM_LIB_VERSION>0x01010000
 	RETURN_STRINGL(buffer, blen, 1);
 #else
 	RETURN_STRING(buffer, 1);
@@ -900,8 +919,55 @@ PHP_METHOD(opendkim, flushCache)
  */
 PHP_METHOD(opendkim, setOption)
 {
-	int option;
+	long optionFlag;
+	zval *optionValue;
+    uint64_t uint64_value;
+    unsigned int uint_value;
+    DKIM_STAT status;
 
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "l/z", &optionFlag, &optionValue) == FAILURE) {
+        RETURN_NULL();
+    }
+
+	switch (optionFlag) {
+	    case DKIM_OPTS_CLOCKDRIFT:
+	    case DKIM_OPTS_FIXEDTIME:
+        case DKIM_OPTS_SIGNATURETTL:
+            convert_to_long(optionValue);
+            uint64_value = Z_LVAL_P(optionValue);
+            status = dkim_options(OPENDKIM_G(opendkim_master), DKIM_OP_SETOPT, optionFlag, &uint64_value, sizeof(uint64_t));
+            break;
+
+	    case DKIM_OPTS_FLAGS:
+#ifdef DKIM_OPTS_MINKEYBITS
+	    case DKIM_OPTS_MINKEYBITS:
+#endif
+        case DKIM_OPTS_TIMEOUT:
+            convert_to_long(optionValue);
+	        uint_value = Z_LVAL_P(optionValue);
+	        status = dkim_options(OPENDKIM_G(opendkim_master), DKIM_OP_SETOPT, optionFlag, &uint_value, sizeof(unsigned int));
+	        break;
+
+	    case DKIM_OPTS_MUSTBESIGNED:
+	    case DKIM_OPTS_OVERSIGNHDRS:
+#ifdef DKIM_OPTS_REQUIREDHDRS
+	    case DKIM_OPTS_REQUIREDHDRS:
+#endif
+	    case DKIM_OPTS_SENDERHDRS:
+	    case DKIM_OPTS_SIGNHDRS:
+	    case DKIM_OPTS_SKIPHDRS:
+        // Unsupported OPTS
+        case DKIM_OPTS_QUERYINFO:
+        case DKIM_OPTS_QUERYMETHOD:
+        case DKIM_OPTS_TMPDIR:
+        default:
+            RETURN_BOOL(0);
+            break;
+	}
+	if (status!=DKIM_STAT_OK) {
+	    RETURN_BOOL(0);
+	}
+	RETURN_BOOL(1);
 
 }/* }}} */
 

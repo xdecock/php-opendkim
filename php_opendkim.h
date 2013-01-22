@@ -77,6 +77,7 @@ PHP_METHOD(opendkim, policySyntax);
 PHP_METHOD(opendkim, getCacheStats);
 PHP_METHOD(opendkim, libFeature);
 PHP_METHOD(opendkim, flushCache);
+PHP_METHOD(opendkim, setOption);
 PHP_METHOD(opendkimFree, __destruct); /* Common function */
 PHP_METHOD(opendkimSign, __construct);
 PHP_METHOD(opendkimSign, loadPrivateKey);
