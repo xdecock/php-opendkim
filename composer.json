@@ -10,7 +10,7 @@
   "require": {
     "php": ">=5.2.0",
     "ext-blast": "*"
-  }
+  },
   "version": "0.9.1",
   "provide": {
     "ext-opendkim": "0.9.1"
