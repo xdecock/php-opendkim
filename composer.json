@@ -1,0 +1,14 @@
+{
+  "name": "xdecock/php-opendkim",
+  "description": "Opendkim Binding",
+  "keywords": ["OpenDKIM", "Native", "DKIM"],
+  "license": "PHP",
+  "authors": [{
+    "name": "De Cock Xavier",
+    "email": "xdecock@gmail.com"
+  }],
+  "require": {
+    "php": ">=5.2.0",
+    "ext-blast": "*"
+  }
+}
