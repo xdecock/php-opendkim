@@ -11,4 +11,8 @@
     "php": ">=5.2.0",
     "ext-blast": "*"
   }
+  "version": "",
+  "provide": {
+    "ext-opendkim": "0.9.1"
+  }
 }

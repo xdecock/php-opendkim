@@ -15,7 +15,7 @@
   | Author: Xavier De Cock <void@php.net>                                |
   +----------------------------------------------------------------------+
 
-  $Id: $ 
+  $Id: $
 */
 #include <php.h>
 #include <opendkim/dkim.h>
@@ -26,7 +26,7 @@
 #ifndef PHP_OPENDKIM_H
 #define PHP_OPENDKIM_H 1
 
-#define PHP_OPENDKIM_VERSION "0.9-dev"
+#define PHP_OPENDKIM_VERSION "0.9.1-dev"
 #define PHP_OPENDKIM_EXTNAME "opendkim"
 
 typedef struct _opendkim_object_handler {
