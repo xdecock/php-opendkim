@@ -117,6 +117,7 @@ extern zend_module_entry opendkim_module_entry;
 #define PHP_OPENDKIM_EXPORT(__type) PHP_OPENDKIM_API __type
 
 #define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
+#define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
 #define OPENDKIM_HANDLER_SETPOINTER(source) ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler=source
 
 #endif
