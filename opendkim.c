@@ -1007,7 +1007,7 @@ PHP_METHOD(opendkim, getCacheStats)
     u_int queries, hits, expired, keys=0;
     _Bool reset= !1;
     OPENDKIM_HANDLER_GETPOINTER(dkim);
-#if OPENDKIM_LIB_VERSION>0x02090000
+#if OPENDKIM_LIB_VERSION>=0x02090000
 	status=dkim_getcachestats(OPENDKIM_G(opendkim_master), &queries, &hits, &expired, &keys, &reset);
 #else
 	status=dkim_getcachestats(&queries, &hits, &expired);
