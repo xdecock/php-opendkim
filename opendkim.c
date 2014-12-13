@@ -421,7 +421,7 @@ PHP_RINIT_FUNCTION(opendkim)
 {
     /* Use PHP Memory */
 	OPENDKIM_G(opendkim_master) = dkim_init(opendkim_mallocf, opendkim_freef);
-	if (OPENDKIM_G(opendkim_master) ==NULL){
+	if (OPENDKIM_G(opendkim_master) == NULL){
 		return FAILURE;
 	}
 	return SUCCESS;
@@ -432,7 +432,9 @@ PHP_RINIT_FUNCTION(opendkim)
 PHP_RSHUTDOWN_FUNCTION(opendkim)
 {
     /* Use PHP Memory */
-	dkim_close(OPENDKIM_G(opendkim_master));
+	if (OPENDKIM_G(opendkim_master) != NULL) {
+		dkim_close(OPENDKIM_G(opendkim_master));
+	}
 	return SUCCESS;
 }
 /* END REQUEST SHUTDOWN */
