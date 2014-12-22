@@ -6,7 +6,7 @@ PHP_ARG_WITH(opendkim, for OpenDKIM support,
 [  --with-opendkim[=DIR]    Include OpenDKIM support (requires libopendkim)])
 
 if test "$PHP_OPENDKIM" != "no"; then
-  if test -r $PHP_OPENDKIM/include/bzlib.h; then
+  if test -r $PHP_OPENDKIM/include/dkim.h; then
     OPENDKIM_DIR=$PHP_OPENDKIM
   else
     AC_MSG_CHECKING(for OpenDKIM in default path)
