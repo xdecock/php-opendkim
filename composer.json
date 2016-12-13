@@ -8,8 +8,7 @@
     "email": "xdecock@gmail.com"
   }],
   "require": {
-    "php": ">=5.2.0",
-    "ext-blast": "*"
+    "php": ">=5.2.0"
   },
   "version": "0.9.1",
   "provide": {
