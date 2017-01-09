@@ -271,14 +271,10 @@ PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_pstate_new(zend_class_ent
 static void opendkim_object_pstate_free_storage(void *object TSRMLS_DC)
 {
    	zend_object *zo = (zend_object *)object;
-	opendkim_object_pstate *intern = (opendkim_object_pstate *) object;
-    DKIM_PSTATE *pstate;
-
-    pstate = intern->pstate;
-    if (pstate) {
-    	dkim_policy_state_free(pstate);
+    opendkim_object_pstate *intern = (opendkim_object_pstate *) object;
+    if (intern->pstate) {
+      zend_throw_exception_ex(zend_exception_get_default(), 1, "Exception at %s:%d", __FILE__, __LINE__);
     }
-    intern->pstate = NULL;
     zend_object_std_dtor(zo TSRMLS_CC);
     efree(intern);
 }
@@ -1033,14 +1029,10 @@ PHP_METHOD(opendkim, policySyntax)
     char *policy=NULL;
     long policy_length=0;
     OPENDKIM_HANDLER_GETPOINTER(dkim);
-	if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &policy, &policy_length) == FAILURE) {
+    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &policy, &policy_length) == FAILURE) {
         RETURN_NULL();
     }
-	status = dkim_policy_syntax(dkim, policy, policy_length);
-	if (status == DKIM_STAT_OK) {
-		RETURN_BOOL(1);
-	}
-	RETURN_BOOL(0);
+    RETURN_BOOL(1);
 }/* }}} */
 
 /* {{{ proto bool openDKIMVerify/Sign::keySyntax
