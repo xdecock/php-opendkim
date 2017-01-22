@@ -36,7 +36,6 @@ typedef struct _opendkim_object_handler {
 
 typedef struct _opendkim_object_pstate {
 	zend_object 		zo;
-	DKIM_PSTATE         *pstate;
 } opendkim_object_pstate; /* extends zend_object */
 
 typedef struct _opendkim_object_queryinfo {

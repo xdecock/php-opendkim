@@ -259,7 +259,6 @@ PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_pstate_new(zend_class_ent
 
 	intern = emalloc(sizeof(opendkim_object_pstate));
 	memset(intern, 0, sizeof(opendkim_object_pstate));
-	intern->pstate = NULL;
 
 	zend_object_std_init(&intern->zo, class_type TSRMLS_CC);
 	retval.handle = zend_objects_store_put(intern, (zend_objects_store_dtor_t) zend_objects_destroy_object, opendkim_object_pstate_free_storage, NULL TSRMLS_CC);
@@ -272,9 +271,6 @@ static void opendkim_object_pstate_free_storage(void *object TSRMLS_DC)
 {
    	zend_object *zo = (zend_object *)object;
     opendkim_object_pstate *intern = (opendkim_object_pstate *) object;
-    if (intern->pstate) {
-      zend_throw_exception_ex(zend_exception_get_default(), 1, "Exception at %s:%d", __FILE__, __LINE__);
-    }
     zend_object_std_dtor(zo TSRMLS_CC);
     efree(intern);
 }
