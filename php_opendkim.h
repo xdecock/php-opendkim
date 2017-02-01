@@ -1,5 +1,5 @@
 /*
-  +----------------------------------------------------------------------+
+  ----------------------------------------------------------------------+
   | PHP Version 5                                                        |
   +----------------------------------------------------------------------+
   | Copyright (c) 1997-2007 The PHP Group                                |
@@ -26,12 +26,25 @@
 #ifndef PHP_OPENDKIM_H
 #define PHP_OPENDKIM_H 1
 
-#define PHP_OPENDKIM_VERSION "0.9.1-dev"
+#define PHP_OPENDKIM_VERSION "0.9.1-dev-minemaz"
 #define PHP_OPENDKIM_EXTNAME "opendkim"
 
+#if ZEND_MODULE_API_NO >= 20151012
+#define TSRMLS_DC
+#define TSRMLS_CC
+typedef zend_object* opendkim_zend_object;
+#else
+typedef zend_object_value opendkim_zend_object;
+#endif
+
 typedef struct _opendkim_object_handler {
+#if ZEND_MODULE_API_NO >= 20151012
+	DKIM                *handler;
+	zend_object 		zo;
+#else
 	zend_object 		zo;
 	DKIM                *handler;
+#endif
 } opendkim_object_handler; /* extends zend_object */
 
 typedef struct _opendkim_object_pstate {
@@ -47,6 +60,10 @@ typedef struct _opendkim_object_siginfo {
 	zend_object 		zo;
 	DKIM_SIGINFO        *siginfo;
 } opendkim_object_siginfo; /* extends zend_object */
+
+static inline opendkim_object_handler *php_opendkim_obj_from_obj(zend_object *obj) {
+  return (opendkim_object_handler *)((char*)(obj) - XtOffsetOf(opendkim_object_handler, zo));
+}
 
 ZEND_BEGIN_MODULE_GLOBALS(opendkim)
 	DKIM_LIB *opendkim_master;
@@ -115,7 +132,6 @@ extern zend_module_entry opendkim_module_entry;
 
 #define PHP_OPENDKIM_EXPORT(__type) PHP_OPENDKIM_API __type
 
-#define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
 #define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
 #define OPENDKIM_HANDLER_SETPOINTER(source) ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler=source
 

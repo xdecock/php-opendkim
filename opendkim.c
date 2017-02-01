@@ -26,12 +26,13 @@
 #include <ext/standard/info.h>
 #include <opendkim/dkim.h>
 #include "php_opendkim.h"
-
 int le_opendkim;
 
 static zend_class_entry *opendkim_class_entry;
 static zend_class_entry *opendkim_sign_class_entry;
 static zend_class_entry *opendkim_verify_class_entry;
+
+zend_object_handlers opendkim_object_handlers;
 
 ZEND_DECLARE_MODULE_GLOBALS(opendkim);
 
@@ -112,8 +113,8 @@ static zend_function_entry opendkim_sign_class_functions[] = {
     PHP_ME(opendkimSign, setPartial,        arginfo_opendkim_sign_set_partial,      ZEND_ACC_PUBLIC)
     PHP_ME(opendkimSign, addQueryMethod,    arginfo_opendkim_sign_add_query_method, ZEND_ACC_PUBLIC)
     PHP_ME(opendkimSign, addXtag,           arginfo_opendkim_sign_add_xtag,         ZEND_ACC_PUBLIC)
-	PHP_ME(opendkimSign, __construct,       arginfo_opendkim_sign___construct,      ZEND_ACC_PUBLIC)
-	{NULL, NULL, NULL}
+    PHP_ME(opendkimSign, __construct,       arginfo_opendkim_sign___construct,      ZEND_ACC_PUBLIC)
+    PHP_FE_END
 };
 
 static zend_function_entry opendkim_verify_class_functions[] = {
@@ -122,7 +123,7 @@ static zend_function_entry opendkim_verify_class_functions[] = {
     PHP_ME(opendkimVerify, getDomain,       NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkimVerify, getUser,         NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkimVerify, getMinBodyLen,   NULL,                                   ZEND_ACC_PUBLIC)
-	{NULL, NULL, NULL}
+    PHP_FE_END
 };
 
 
@@ -131,7 +132,7 @@ static zend_function_entry opendkim_class_functions[] = {
     PHP_ME(opendkim,    flushCache,         NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    getCacheStats,      NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    setOption,          arginfo_opendkim_set_option,            ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
-    {NULL, NULL, NULL}
+    PHP_FE_END
 };
 
 zend_module_entry opendkim_module_entry = {
@@ -156,43 +157,83 @@ ZEND_GET_MODULE(opendkim)
 #endif
 
 /* opendkim handlers */
-PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_handler_new(zend_class_entry *class_type TSRMLS_DC)
+#if ZEND_MODULE_API_NO < 20151012
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new_ex(zend_class_entry *class_type, opendkim_object_handler **ptr TSRMLS_DC)
+#else
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new_ex(zend_class_entry *class_type, int init_props)
+#endif
 {
-	zend_object_value retval;
 	opendkim_object_handler *intern;
-
-
+#if ZEND_MODULE_API_NO < 20151012
+	opendkim_zend_object retval;
 	intern = emalloc(sizeof(opendkim_object_handler));
 	memset(intern, 0, sizeof(opendkim_object_handler));
 	intern->handler = NULL;
 
 	zend_object_std_init(&intern->zo, class_type TSRMLS_CC);
 	retval.handle = zend_objects_store_put(intern, (zend_objects_store_dtor_t) zend_objects_destroy_object, opendkim_object_handler_free_storage, NULL TSRMLS_CC);
-    retval.handlers = zend_get_std_object_handlers();
+  retval.handlers = &opendkim_object_handler;
 
 	return retval;
+#else
+	intern = ecalloc(1, sizeof(opendkim_object_handler) + zend_object_properties_size(class_type));
+  zend_object_std_init(&intern->zo, class_type);
+
+  if (init_props) {
+    object_properties_init(&intern->zo, class_type);
+  }
+	intern->zo.handlers = &opendkim_object_handlers;
+	return &intern->zo;
+#endif
 }
+
+#if ZEND_MODULE_API_NO < 20151012
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new(zend_class_entry *class_type TSRMLS_DC)
+{
+  return opendkim_object_handler_new_ex(class_type, NULL, 1);
+}
+#else
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new(zend_class_entry *class_type)
+{
+  return opendkim_object_handler_new_ex(class_type, 1);
+}
+#endif
 
 static void opendkim_object_handler_free_storage(void *object TSRMLS_DC)
 {
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
    	zend_object *zo = (zend_object *)object;
-	opendkim_object_handler *intern = (opendkim_object_handler *)object;
+#if ZEND_MODULE_API_NO < 20151012
+  	opendkim_object_handler *intern = (opendkim_object_handler *)object;
+#else
+  	opendkim_object_handler *intern = php_opendkim_obj_from_obj(zo);
+#endif
     DKIM *dkim;
 
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     dkim = intern->handler;
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     if (dkim) {
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     	dkim_free(dkim);
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     }
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     intern->handler = NULL;
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
     zend_object_std_dtor(zo TSRMLS_CC);
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
+#if ZEND_MODULE_API_NO < 20151012
     efree(intern);
+#endif
 }
 
 /* opendkim query infos */
-PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_queryinfo_new(zend_class_entry *class_type TSRMLS_DC)
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_queryinfo_new(zend_class_entry *class_type TSRMLS_DC)
 {
-	zend_object_value retval;
 	opendkim_object_queryinfo *intern;
+#if ZEND_MODULE_API_NO < 20151012
+	opendkim_zend_object retval;
 
 
 	intern = emalloc(sizeof(opendkim_object_queryinfo));
@@ -204,6 +245,9 @@ PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_queryinfo_new(zend_class_
     retval.handlers = zend_get_std_object_handlers();
 
 	return retval;
+#else
+
+#endif
 }
 
 static void opendkim_object_queryinfo_free_storage(void *object TSRMLS_DC)
@@ -222,10 +266,11 @@ static void opendkim_object_queryinfo_free_storage(void *object TSRMLS_DC)
 }
 
 /* opendkim signature infos */
-PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_siginfo_new(zend_class_entry *class_type TSRMLS_DC)
+PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_siginfo_new(zend_class_entry *class_type TSRMLS_DC)
 {
-	zend_object_value retval;
 	opendkim_object_siginfo *intern;
+#if ZEND_MODULE_API_NO < 20151012
+	opendkim_zend_object retval;
 
 
 	intern = emalloc(sizeof(opendkim_object_siginfo));
@@ -237,40 +282,18 @@ PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_siginfo_new(zend_class_en
     retval.handlers = zend_get_std_object_handlers();
 
 	return retval;
+#else
+
+#endif
 }
 
 static void opendkim_object_siginfo_free_storage(void *object TSRMLS_DC)
 {
    	zend_object *zo = (zend_object *)object;
-	opendkim_object_siginfo *intern = (opendkim_object_siginfo *)object;
+    opendkim_object_siginfo *intern = (opendkim_object_siginfo *)object;
     DKIM_QUERYINFO *siginfo;
 
     intern->siginfo = NULL;
-    zend_object_std_dtor(zo TSRMLS_CC);
-    efree(intern);
-}
-
-/* opendkim policy states */
-PHP_OPENDKIM_EXPORT(zend_object_value) opendkim_object_pstate_new(zend_class_entry *class_type TSRMLS_DC)
-{
-	zend_object_value retval;
-	opendkim_object_pstate *intern;
-
-
-	intern = emalloc(sizeof(opendkim_object_pstate));
-	memset(intern, 0, sizeof(opendkim_object_pstate));
-
-	zend_object_std_init(&intern->zo, class_type TSRMLS_CC);
-	retval.handle = zend_objects_store_put(intern, (zend_objects_store_dtor_t) zend_objects_destroy_object, opendkim_object_pstate_free_storage, NULL TSRMLS_CC);
-    retval.handlers = zend_get_std_object_handlers();
-
-	return retval;
-}
-
-static void opendkim_object_pstate_free_storage(void *object TSRMLS_DC)
-{
-   	zend_object *zo = (zend_object *)object;
-    opendkim_object_pstate *intern = (opendkim_object_pstate *) object;
     zend_object_std_dtor(zo TSRMLS_CC);
     efree(intern);
 }
@@ -298,18 +321,41 @@ PHP_MINIT_FUNCTION(opendkim)
     /* Class Registration OpenDKIM */
 	zend_class_entry ce;
 	INIT_CLASS_ENTRY(ce, "OpenDKIM", opendkim_class_functions);
+#if ZEND_MODULE_API_NO < 20151012
 	opendkim_class_entry = zend_register_internal_class_ex(&ce, NULL, NULL TSRMLS_CC);
+#else
+	opendkim_class_entry = zend_register_internal_class_ex(&ce, NULL);
+#endif
+  memcpy(&opendkim_object_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
+#if ZEND_MODULE_API_NO >= 20151012
+  opendkim_object_handlers.offset = XtOffsetOf(opendkim_object_handler, zo);
+  opendkim_object_handlers.free_obj = opendkim_object_handler_free_storage;
+#endif
+  opendkim_object_handlers.clone_obj = (void *)1;
+  opendkim_object_handlers.compare_objects = (void *)2;
+  opendkim_object_handlers.get_properties = (void *)3;
+  opendkim_object_handlers.get_gc = (void *) 4;
+
+
     /* Class Registration OpenDKIMSign */
 	zend_class_entry ces;
 	INIT_CLASS_ENTRY(ces, "OpenDKIMSign", opendkim_sign_class_functions);
-    ces.create_object=opendkim_object_handler_new;
+    ces.create_object = opendkim_object_handler_new;
+#if ZEND_MODULE_API_NO < 20151012
 	opendkim_sign_class_entry = zend_register_internal_class_ex(&ces, NULL, NULL TSRMLS_CC);
+#else
+	opendkim_sign_class_entry = zend_register_internal_class_ex(&ces, NULL);
+#endif
 
     /* Class Registration OpenDKIMVerify */
 	zend_class_entry cev;
 	INIT_CLASS_ENTRY(cev, "OpenDKIMVerify", opendkim_verify_class_functions);
-    cev.create_object=opendkim_object_handler_new;
+    cev.create_object = opendkim_object_handler_new;
+#if ZEND_MODULE_API_NO < 20151012
 	opendkim_verify_class_entry = zend_register_internal_class_ex(&cev, NULL, NULL TSRMLS_CC);
+#else
+	opendkim_verify_class_entry = zend_register_internal_class_ex(&cev, NULL);
+#endif
 
     /* Class constants OpenDKIM */
     zend_declare_class_constant_long(opendkim_class_entry, "OPENSSL_VERSION",           sizeof("OPENSSL_VERSION")-1,            (long)dkim_ssl_version() TSRMLS_CC);
@@ -514,14 +560,15 @@ PHP_METHOD(opendkimSign, __construct)
     body_length = rbody_length;
 
 	dkim = dkim_sign(OPENDKIM_G(opendkim_master), "", NULL, privateKey, selector, domain, header_canon, body_canon, sign_alg, body_length, &status);
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
 	if (status!=DKIM_STAT_OK){
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
         RETURN_BOOL(0);
 	} else {
+printf("debug: %s[%d]\n", __FILE__, __LINE__);
         OPENDKIM_HANDLER_SETPOINTER(dkim);
     }
 }/* }}} */
-
-/* {{{ proto boolean
 
 /* {{{ proto boolean header(header)
  */
@@ -643,7 +690,11 @@ PHP_METHOD(opendkim, getError)
     if (error==NULL) {
         RETURN_BOOL(0);
     }
+#if ZEND_MODULE_API_NO < 20151012
     RETURN_STRING(error, 1);
+#else
+    RETURN_STRING(error);
+#endif
 }/* }}} */
 
 /* {{{ proto bool loadPrivateKey()
@@ -808,10 +859,14 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
 	if (status!=DKIM_STAT_OK){
 		RETURN_LONG(status);
 	}
+#if ZEND_MODULE_API_NO < 20151012
 #if OPENDKIM_LIB_VERSION>0x01010000
 	RETURN_STRINGL(buffer, blen, 1);
 #else
 	RETURN_STRING(buffer, 1);
+#endif
+#else
+	RETURN_STRING(buffer);
 #endif
 
 }/* }}} */
@@ -822,6 +877,7 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
  */
 PHP_METHOD(opendkimVerify, __construct)
 {
+        RETURN_BOOL(0);
 	DKIM *dkim;
 	DKIM_STAT status=0;
     zval *opendkim_ressource;
@@ -873,7 +929,11 @@ PHP_METHOD(opendkimVerify, getDomain)
     if (domain == NULL) {
         RETURN_BOOL(0);
     }
+#if ZEND_MODULE_API_NO < 20151012
     RETURN_STRING(domain, 1);
+#else
+    RETURN_STRING(domain);
+#endif
 }/* }}} */
 
 /* {{{ proto string openDKIMVerify::getUser()
@@ -887,7 +947,11 @@ PHP_METHOD(opendkimVerify, getUser)
     if (user == NULL) {
         RETURN_BOOL(0);
     }
+#if ZEND_MODULE_API_NO < 20151012
     RETURN_STRING(user, 1);
+#else
+    RETURN_STRING(user);
+#endif
 }/* }}} */
 
 /* {{{ proto string openDKIMVerify::getMinBodyLen()
