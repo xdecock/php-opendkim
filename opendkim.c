@@ -183,7 +183,7 @@ PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new_ex(zend_cl
 
 	zend_object_std_init(&intern->zo, class_type TSRMLS_CC);
 	retval.handle = zend_objects_store_put(intern, (zend_objects_store_dtor_t) zend_objects_destroy_object, opendkim_object_handler_free_storage, NULL TSRMLS_CC);
-  retval.handlers = &opendkim_object_handler;
+  retval.handlers = &opendkim_object_handlers;
 
 	return retval;
 #endif
@@ -197,7 +197,7 @@ PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new(zend_class
 #else
 PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_handler_new(zend_class_entry *class_type TSRMLS_DC)
 {
-  return opendkim_object_handler_new_ex(class_type, NULL, 1);
+  return opendkim_object_handler_new_ex(class_type, NULL);
 }
 #endif
 
@@ -270,7 +270,7 @@ PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_queryinfo_new
 #else
 PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_queryinfo_new(zend_class_entry *class_type TSRMLS_DC)
 {
-  return opendkim_object_queryinfo_new_ex(class_type, NULL, 1);
+  return opendkim_object_queryinfo_new_ex(class_type, NULL);
 }
 #endif
 
@@ -339,7 +339,7 @@ PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_siginfo_new
 #else
 PHP_OPENDKIM_EXPORT(opendkim_zend_object) opendkim_object_siginfo_new(zend_class_entry *class_type TSRMLS_DC)
 {
-  return opendkim_object_siginfo_new_ex(class_type, NULL, 1);
+  return opendkim_object_siginfo_new_ex(class_type, NULL);
 }
 #endif
 
@@ -351,8 +351,12 @@ static void opendkim_object_siginfo_free_storage(void *object TSRMLS_DC)
 {
    	zend_object *zo = (zend_object *)object;
     opendkim_object_siginfo *intern = (opendkim_object_siginfo *)object;
-    DKIM_QUERYINFO *siginfo;
+    DKIM_SIGINFO *siginfo;
 
+    siginfo = intern->siginfo;
+    if (siginfo) {
+    	efree(siginfo);
+    }
     intern->siginfo = NULL;
     zend_object_std_dtor(zo TSRMLS_CC);
 #if ZEND_MODULE_API_NO >= 20151012
@@ -367,9 +371,13 @@ void opendkim_global_shutdown(zend_opendkim_globals *opendkim_globals) {}
 
 /* emalloc wrapper */
 void * opendkim_mallocf(void *closure, size_t nbytes) {
-    return emalloc(nbytes);
+    void *p = emalloc(nbytes);
+    //printf("debug: malloc %lx %d\n", p, nbytes);
+    return p;
+    //return emalloc(nbytes);
 }
 void opendkim_freef(void *closure, void *p) {
+    //printf("debug: efree %lx\n", p);
     return efree(p);
 }
 /* END emalloc wrapper */
