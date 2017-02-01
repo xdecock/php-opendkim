@@ -47,23 +47,38 @@ typedef struct _opendkim_object_handler {
 #endif
 } opendkim_object_handler; /* extends zend_object */
 
+#if ZEND_MODULE_API_NO >= 20151012
+#else
 typedef struct _opendkim_object_pstate {
 	zend_object 		zo;
 } opendkim_object_pstate; /* extends zend_object */
+#endif
 
 typedef struct _opendkim_object_queryinfo {
+#if ZEND_MODULE_API_NO >= 20151012
 	zend_object 		zo;
 	DKIM_QUERYINFO      *queryinfo;
+#else
+	DKIM_QUERYINFO      *queryinfo;
+	zend_object 		zo;
+#endif
 } opendkim_object_queryinfo; /* extends zend_object */
 
 typedef struct _opendkim_object_siginfo {
+#if ZEND_MODULE_API_NO >= 20151012
 	zend_object 		zo;
 	DKIM_SIGINFO        *siginfo;
+#else
+	DKIM_SIGINFO        *siginfo;
+	zend_object 		zo;
+#endif
 } opendkim_object_siginfo; /* extends zend_object */
 
 static inline opendkim_object_handler *php_opendkim_obj_from_obj(zend_object *obj) {
   return (opendkim_object_handler *)((char*)(obj) - XtOffsetOf(opendkim_object_handler, zo));
 }
+
+void opendkim_runtime_version(char *buf);
 
 ZEND_BEGIN_MODULE_GLOBALS(opendkim)
 	DKIM_LIB *opendkim_master;
@@ -110,10 +125,17 @@ PHP_METHOD(opendkimVerify, getDomain);
 PHP_METHOD(opendkimVerify, getUser);
 PHP_METHOD(opendkimVerify, getMinBodyLen);
 
+#if ZEND_MODULE_API_NO >= 20151012
+static void opendkim_object_handler_free_storage(struct _zend_object *object);
+static void opendkim_object_pstate_free_storage(struct _zend_object *object);
+static void opendkim_object_queryinfo_free_storage(struct _zend_object *object);
+static void opendkim_object_siginfo_free_storage(struct _zend_object *object);
+#else
 static void opendkim_object_handler_free_storage(void *object TSRMLS_DC);
 static void opendkim_object_pstate_free_storage(void *object TSRMLS_DC);
 static void opendkim_object_queryinfo_free_storage(void *object TSRMLS_DC);
 static void opendkim_object_siginfo_free_storage(void *object TSRMLS_DC);
+#endif
 
 extern zend_module_entry opendkim_module_entry;
 
@@ -132,7 +154,13 @@ extern zend_module_entry opendkim_module_entry;
 
 #define PHP_OPENDKIM_EXPORT(__type) PHP_OPENDKIM_API __type
 
-#define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
-#define OPENDKIM_HANDLER_SETPOINTER(source) ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler=source
+#if ZEND_MODULE_API_NO >= 20151012
+#  define PHP_OPENDKIM_OBJ_FROM_ZVAL(zv) php_opendkim_obj_from_obj(Z_OBJ_P(zv))->handler
+#  define OPENDKIM_HANDLER_GETPOINTER(dest) dest = PHP_OPENDKIM_OBJ_FROM_ZVAL(getThis())
+#  define OPENDKIM_HANDLER_SETPOINTER(source) PHP_OPENDKIM_OBJ_FROM_ZVAL(getThis())=source
+#else
+#  define OPENDKIM_HANDLER_GETPOINTER(dest) dest = ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler
+#  define OPENDKIM_HANDLER_SETPOINTER(source) ((opendkim_object_handler *) zend_object_store_get_object(getThis() TSRMLS_CC))->handler=source
+#endif
 
 #endif
