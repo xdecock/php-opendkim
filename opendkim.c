@@ -125,6 +125,11 @@ static zend_function_entry opendkim_verify_class_functions[] = {
     PHP_ME(opendkimVerify, getDomain,       NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkimVerify, getUser,         NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkimVerify, getMinBodyLen,   NULL,                                   ZEND_ACC_PUBLIC)
+    PHP_ME(opendkim,     chunk,             arginfo_opendkim_chunk,                 ZEND_ACC_PUBLIC)
+    PHP_ME(opendkim,     body,              arginfo_opendkim_body,                  ZEND_ACC_PUBLIC)
+    PHP_ME(opendkim,     eom,               NULL,                                   ZEND_ACC_PUBLIC)
+    PHP_ME(opendkimSign, getSignatureHeader,NULL,                                   ZEND_ACC_PUBLIC)
+    PHP_ME(opendkim,     getError,          NULL,                                   ZEND_ACC_PUBLIC)
     PHP_FE_END
 };
 
@@ -371,13 +376,9 @@ void opendkim_global_shutdown(zend_opendkim_globals *opendkim_globals) {}
 
 /* emalloc wrapper */
 void * opendkim_mallocf(void *closure, size_t nbytes) {
-    void *p = emalloc(nbytes);
-    //printf("debug: malloc %lx %d\n", p, nbytes);
-    return p;
-    //return emalloc(nbytes);
+    return emalloc(nbytes);
 }
 void opendkim_freef(void *closure, void *p) {
-    //printf("debug: efree %lx\n", p);
     return efree(p);
 }
 /* END emalloc wrapper */
@@ -402,33 +403,18 @@ PHP_MINIT_FUNCTION(opendkim)
   opendkim_object_handlers.offset = XtOffsetOf(opendkim_object_handler, zo);
   opendkim_object_handlers.free_obj = opendkim_object_handler_free_storage;
 #endif
-  opendkim_object_handlers.clone_obj = (void *)1;
-  opendkim_object_handlers.compare_objects = (void *)2;
-  opendkim_object_handlers.get_properties = (void *)3;
-  opendkim_object_handlers.get_gc = (void *) 4;
 
   memcpy(&opendkim_object_queryinfos, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 #if ZEND_MODULE_API_NO >= 20151012
   opendkim_object_queryinfos.offset = XtOffsetOf(opendkim_object_queryinfo, zo);
   opendkim_object_queryinfos.free_obj = opendkim_object_queryinfo_free_storage;
 #endif
-  opendkim_object_queryinfos.clone_obj = (void *)1;
-  opendkim_object_queryinfos.compare_objects = (void *)2;
-  opendkim_object_queryinfos.get_properties = (void *)3;
-  opendkim_object_queryinfos.get_gc = (void *) 4;
 
   memcpy(&opendkim_object_siginfos, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 #if ZEND_MODULE_API_NO >= 20151012
   opendkim_object_siginfos.offset = XtOffsetOf(opendkim_object_siginfo, zo);
   opendkim_object_siginfos.free_obj = opendkim_object_siginfo_free_storage;
 #endif
-  opendkim_object_siginfos.clone_obj = (void *)1;
-  opendkim_object_siginfos.compare_objects = (void *)2;
-  opendkim_object_siginfos.get_properties = (void *)3;
-  opendkim_object_siginfos.get_gc = (void *) 4;
-
-
-
 
     /* Class Registration OpenDKIMSign */
 	zend_class_entry ces;
@@ -990,7 +976,7 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
 	RETURN_STRING((const char *)buffer);
 #else
 #if OPENDKIM_LIB_VERSION>0x01010000
-	RETURN_STRINGL(buffer, blen, 1);
+	RETURN_STRINGL((const char *)buffer, blen, 1);
 #else
 	RETURN_STRING(buffer, 1);
 #endif
@@ -1004,7 +990,6 @@ PHP_METHOD(opendkimSign, getSignatureHeader)
  */
 PHP_METHOD(opendkimVerify, __construct)
 {
-        RETURN_BOOL(0);
 	DKIM *dkim;
 	DKIM_STAT status=0;
 #if ZEND_MODULE_API_NO >= 20151012
