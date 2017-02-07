@@ -1,0 +1,30 @@
+Return-Path: <mine@lancard.com>
+Delivered-To: <mine@lancard.com>
+Received: from po.lancard.com
+	by po.lancard.com (Dovecot) with LMTP id H8uTJk8Dmlg0UgAAP6b6kQ
+	for <mine@lancard.com>; Wed, 08 Feb 2017 02:27:53 +0900
+Received: from Minematsu-no-MacBook-Pro.local (213.0.221.202.bf.2iij.net [202.221.0.213])
+	(using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+	(No client certificate requested)
+	by po.lancard.com (Postfix) with ESMTPS id 9B05529C28FC
+	for <mine@lancard.com>; Wed,  8 Feb 2017 02:27:53 +0900 (JST)
+DKIM-Filter: OpenDKIM Filter v2.11.0 po.lancard.com 9B05529C28FC
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=lancard.com;
+	s=20151004; t=1486488473;
+	bh=20klD6Zz4B/AqvfZ0Afx4NhK340VFeXhzw0WAjX1Dyo=;
+	h=To:From:Subject:Date:From;
+	b=c5mg1tnkBToBx7tNTKB9Mh1xYIbvtvwTlhhqQM1n03o7u9jtihJKNzXPRfydT7rv5
+	 TRpphZU1h4AA5cwE7n766rP1kwW9YOEfgjawHS1TWcyoDe9yW42N9yPz3wy4PXhN5s
+	 xkJSWvUgYRx8NkHcVRp6tv9EQnSKfu2yAfmMYQzQ=
+To: mine@lancard.com
+From: Hiroki MINEMATSU <mine@lancard.com>
+Subject: dkimtest
+Message-ID: <c5952933-d0d5-fb48-c51f-74d881d13b3d@lancard.com>
+Date: Wed, 8 Feb 2017 02:27:53 +0900
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.11; rv:45.0)
+ Gecko/20100101 Thunderbird/45.7.0
+MIME-Version: 1.0
+Content-Type: text/plain; charset=iso-2022-jp
+Content-Transfer-Encoding: 7bit
+
+none
