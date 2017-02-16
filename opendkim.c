@@ -1265,10 +1265,12 @@ PHP_METHOD(opendkimVerify, getARSigs)
 		char *dnssec;
 		unsigned char *domain;
 		char ss[BUFRSZ + 1];
+		char tmp[BUFRSZ + 1];
 		char authResults[BUFRSZ + 1];
 		unsigned char val[MAXADDRESS + 1];
 		char comment[BUFRSZ + 1];
 
+		memset(authResults, '\0', sizeof(authResults));
 		for (c = 0; c < nsigs; c++) {
 			dnssec = NULL;
 
@@ -1326,7 +1328,7 @@ PHP_METHOD(opendkimVerify, getARSigs)
 
       domain = dkim_sig_getdomain(sigs[c]);
 
-      snprintf(authResults, sizeof(authResults),
+      snprintf(tmp, sizeof(tmp),
           "%sdkim=%s%s (%u-bit key%s%s) header.d=%s header.i=%s%s%s%s",
           c == 0 ? "" : ";\n",
           result, comment,
@@ -1338,12 +1340,13 @@ PHP_METHOD(opendkimVerify, getARSigs)
           ts == DKIM_STAT_OK ? ss : "",
           ts == DKIM_STAT_OK ? "\"" : ""
           );
+      strlcat(authResults, tmp, sizeof(authResults));
+    }
 #if ZEND_MODULE_API_NO >= 20151012
       RETURN_STRING(authResults);
 #else
       RETURN_STRING(authResults, 1);
 #endif
-    }
   }else{
     RETURN_NULL();
   }
