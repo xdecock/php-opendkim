@@ -29,6 +29,7 @@
 int le_opendkim;
 
 static zend_class_entry *opendkim_class_entry;
+static zend_class_entry *opendkim_siginfo_class_entry;
 static zend_class_entry *opendkim_sign_class_entry;
 static zend_class_entry *opendkim_verify_class_entry;
 
@@ -129,6 +130,7 @@ static zend_function_entry opendkim_verify_class_functions[] = {
     PHP_ME(opendkim,     body,              arginfo_opendkim_body,                  ZEND_ACC_PUBLIC)
     PHP_ME(opendkim,     eom,               NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkimSign, getSignatureHeader,NULL,                                   ZEND_ACC_PUBLIC)
+    PHP_ME(opendkimVerify,     getARSigs,         NULL,                                   ZEND_ACC_PUBLIC)
     PHP_ME(opendkim,     getError,          NULL,                                   ZEND_ACC_PUBLIC)
     PHP_FE_END
 };
@@ -139,6 +141,10 @@ static zend_function_entry opendkim_class_functions[] = {
     PHP_ME(opendkim,    flushCache,         NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    getCacheStats,      NULL,                                   ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
     PHP_ME(opendkim,    setOption,          arginfo_opendkim_set_option,            ZEND_ACC_PUBLIC|ZEND_ACC_STATIC)
+    PHP_FE_END
+};
+
+static zend_function_entry opendkim_siginfo_class_functions[] = {
     PHP_FE_END
 };
 
@@ -410,6 +416,14 @@ PHP_MINIT_FUNCTION(opendkim)
   opendkim_object_queryinfos.free_obj = opendkim_object_queryinfo_free_storage;
 #endif
 
+  zend_class_entry cesig;
+  INIT_CLASS_ENTRY(cesig, "OpenDKIMSigInfo", opendkim_siginfo_class_functions);
+    cesig.create_object = opendkim_object_handler_new;
+#if ZEND_MODULE_API_NO >= 20151012
+  opendkim_siginfo_class_entry = zend_register_internal_class_ex(&cesig, NULL);
+#else
+  opendkim_siginfo_class_entry = zend_register_internal_class_ex(&cesig, NULL, NULL TSRMLS_CC);
+#endif
   memcpy(&opendkim_object_siginfos, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 #if ZEND_MODULE_API_NO >= 20151012
   opendkim_object_siginfos.offset = XtOffsetOf(opendkim_object_siginfo, zo);
@@ -1180,7 +1194,7 @@ PHP_METHOD(opendkim, getCacheStats)
     _Bool reset= !1;
     OPENDKIM_HANDLER_GETPOINTER(dkim);
 #if OPENDKIM_LIB_VERSION>=0x02090000
-	status=dkim_getcachestats(OPENDKIM_G(opendkim_master), &queries, &hits, &expired, &keys, &reset);
+	status=dkim_getcachestats(OPENDKIM_G(opendkim_master), &queries, &hits, &expired, &keys, reset);
 #else
 	status=dkim_getcachestats(&queries, &hits, &expired);
 #endif
@@ -1228,4 +1242,109 @@ PHP_METHOD(opendkim, keySyntax)
 		RETURN_BOOL(1);
 	}
 	RETURN_BOOL(0);
+}/* }}} */
+
+/* {{{ proto string openDKIMVerify::getARSigs
+ */
+PHP_METHOD(opendkimVerify, getARSigs)
+{
+  DKIM_STAT dstatus;
+  DKIM *dkim;
+  int nsigs;
+  DKIM_SIGINFO **sigs;
+
+  OPENDKIM_HANDLER_GETPOINTER(dkim);
+  dstatus = dkim_getsiglist(dkim, &sigs, &nsigs);
+  if (dstatus == DKIM_STAT_OK) {
+		int c;
+		int sigerror;
+		DKIM_STAT ts;
+		u_int keybits;
+		size_t ssl;
+		char *result;
+		char *dnssec;
+		unsigned char *domain;
+		char ss[BUFRSZ + 1];
+		char authResults[BUFRSZ + 1];
+		unsigned char val[MAXADDRESS + 1];
+		char comment[BUFRSZ + 1];
+
+		for (c = 0; c < nsigs; c++) {
+			dnssec = NULL;
+
+			memset(comment, '\0', sizeof(comment));
+
+			sigerror = dkim_sig_geterror(sigs[c]);
+
+      if (dkim_sig_getkeysize(sigs[c], &keybits) != DKIM_STAT_OK) {
+        keybits = 0;
+      }
+
+      ssl = sizeof(ss) - 1;
+      ts = dkim_get_sigsubstring(dkim, sigs[c], ss, &ssl);
+
+      if ((dkim_sig_getflags(sigs[c]) & DKIM_SIGFLAG_PASSED) != 0 &&
+          dkim_sig_getbh(sigs[c]) == DKIM_SIGBH_MATCH) {
+        result = "pass";
+      }else if (sigerror == DKIM_SIGERROR_MULTIREPLY ||
+          sigerror == DKIM_SIGERROR_KEYFAIL ||
+          sigerror == DKIM_SIGERROR_DNSSYNTAX) {
+        result = "temperror";
+      }else if (sigerror == DKIM_SIGERROR_KEYTOOSMALL) {
+        const char *err;
+
+        result = "policy";
+
+        err = dkim_sig_geterrorstr(dkim_sig_geterror(sigs[c]));
+        if (err != NULL) {
+          snprintf(comment, sizeof(comment),
+              " reason=\"%s\"", err);
+        }
+      }else if ((dkim_sig_getflags(sigs[c]) & DKIM_SIGFLAG_PROCESSED) != 0 &&
+          ((dkim_sig_getflags(sigs[c]) & DKIM_SIGFLAG_PASSED) == 0 ||
+           dkim_sig_getbh(sigs[c]) != DKIM_SIGBH_MATCH)) {
+        const char *err;
+
+        result = "fail";
+
+        err = dkim_sig_geterrorstr(dkim_sig_geterror(sigs[c]));
+        if (err != NULL) {
+          snprintf(comment, sizeof(comment), " reason=\"%s\"", err);
+        }
+      }else if (sigerror != DKIM_SIGERROR_UNKNOWN &&
+          sigerror != DKIM_SIGERROR_OK) {
+        result = "permerror";
+      }else{
+        result = "neutral";
+      }
+
+      dnssec = NULL;
+
+      memset(val, '\0', sizeof(val));
+
+      (void) dkim_sig_getidentity(dkim, sigs[c], val, sizeof(val) - 1);
+
+      domain = dkim_sig_getdomain(sigs[c]);
+
+      snprintf(authResults, sizeof(authResults),
+          "%sdkim=%s%s (%u-bit key%s%s) header.d=%s header.i=%s%s%s%s",
+          c == 0 ? "" : ";\n",
+          result, comment,
+          keybits,
+          dnssec == NULL ? "" : "; ",
+          dnssec == NULL ? "" : dnssec,
+          domain, val,
+          ts == DKIM_STAT_OK ? " header.b=\"" : "",
+          ts == DKIM_STAT_OK ? ss : "",
+          ts == DKIM_STAT_OK ? "\"" : ""
+          );
+#if ZEND_MODULE_API_NO >= 20151012
+      RETURN_STRING(authResults);
+#else
+      RETURN_STRING(authResults, 1);
+#endif
+    }
+  }else{
+    RETURN_NULL();
+  }
 }/* }}} */
